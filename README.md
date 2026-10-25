@@ -6,6 +6,8 @@ into the movement, then rebuild it in your own metal and reserve one.
 
 > ORIEL is a concept. It is not a real brand, nothing is for sale, and checkout is switched off.
 
+![ORIEL hero: a procedural 3D watch beside the headline "Time, taken apart."](docs/screenshots/hero.jpg)
+
 ## Highlights
 
 - **Procedural 3D watch**: case, dial, hands, a moving gear train, jewels, rotor and strap, all generated in
@@ -20,6 +22,17 @@ into the movement, then rebuild it in your own metal and reserve one.
   and a complete static experience under `prefers-reduced-motion`, without WebGL, or without JavaScript
   (every still is rendered from the same 3D model).
 
+## Screenshots
+
+| | |
+| --- | --- |
+| ![Exploded anatomy: seven layers of the watch with labelled leaders](docs/screenshots/anatomy.jpg) | ![Movement dive: the escapement and rotor of the Calibre O-1](docs/screenshots/movement.jpg) |
+| **Anatomy.** The watch separates into seven layers as you scroll. | **Movement.** The camera dives into the escapement, barrel and rotor. |
+| ![Configurator: choose case metal and dial](docs/screenshots/configure.jpg) | ![Product page with a drag-to-turn 3D viewer](docs/screenshots/product.jpg) |
+| **Configure.** Pick a metal and a dial, and the 3D watch re-finishes live. | **Product page.** A drag-to-turn viewer with front, profile, caseback and exploded views. |
+
+Captured from the running site with `npm run screenshots`.
+
 ## Stack
 
 Vite · vanilla JavaScript (ES modules) · GSAP 3 (ScrollTrigger, SplitText, CustomEase) · Lenis · Three.js ·
@@ -33,6 +46,7 @@ npm run dev        # local dev server
 npm run build      # production build into dist/
 npm run preview    # serve the production build
 npm run posters    # re-render public/media/* from the 3D model (needs Edge or Chrome installed)
+npm run screenshots # re-capture docs/screenshots/* for this README (needs Edge or Chrome installed)
 ```
 
 Dev-only query flags: `?reduced` (force reduced motion), `?nowebgl` (force the poster fallback),
@@ -47,7 +61,7 @@ src/three/          procedural watch, materials, studio lighting, stage and pose
 src/ui/             buttons, cursor, nav, preloader, page transitions, bag, hold, odometer, configurator
 src/sections/       index-page chapters and the director that drives the watch from scroll
 src/pages/          product page
-scripts/            poster renderer, icon extraction
+scripts/            poster renderer, README screenshots, icon extraction
 ```
 
 ## Credits
