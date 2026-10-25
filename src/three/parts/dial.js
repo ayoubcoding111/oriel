@@ -57,7 +57,7 @@ export function createDial({ mats, hi }) {
 
   const builder = faceted();
   INDICES.forEach((index) => baton(builder, index, DIAL_Z, 0.014));
-  const batons = new Mesh(builder.build(), mats.metal('accent', 'dial'));
+  const batons = new Mesh(builder.build(), mats.metal('accent'));
 
   group.add(disc, shell, batons);
   return { group, rim: { radius: DIAL_RADIUS, z: DIAL_Z } };
@@ -95,7 +95,7 @@ function lumeStrip(len, from, width, z) {
 
 export function createHands({ mats, hi }) {
   const group = new Group();
-  const metal = mats.metal('accent', 'hands');
+  const metal = mats.metal('accent');
   const seg = hi ? 40 : 20;
   const cyl = (r, h, z) => new CylinderGeometry(r, r, h, seg).rotateX(Math.PI / 2).translate(0, 0, z + h / 2);
 

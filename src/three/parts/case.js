@@ -47,7 +47,7 @@ function lugs(hi) {
 
 function crown(mats, hi) {
   const group = new Group();
-  const polished = mats.metal('polished', 'case');
+  const polished = mats.metal('polished');
   const segs = hi ? 48 : 24;
   const knurl = extrude(gearShape({ teeth: hi ? 44 : 32, root: 0.124, tip: 0.136, style: 'knurl', fill: 0.62, detail: 3 }), {
     depth: 0.1,
@@ -58,7 +58,7 @@ function crown(mats, hi) {
   const tube = new CylinderGeometry(0.052, 0.056, 0.08, segs).rotateZ(Math.PI / 2).translate(1.02, 0, 0);
   const cap = lathe([[0.112, 0], [0.104, 0.008], [0.06, 0.016], [0, 0.018]], segs).rotateY(Math.PI / 2).translate(1.15, 0, 0);
   const body = new Mesh(merge([knurl, tube, cap]), polished);
-  const markMaterial = mats.metal('polished', 'case', { aoMap: mats.textures.crown, aoMapIntensity: 1 });
+  const markMaterial = mats.metal('polished', { aoMap: mats.textures.crown, aoMapIntensity: 1 });
   const mark = new Mesh(new CircleGeometry(0.058, segs).rotateY(Math.PI / 2).translate(1.1675, 0, 0), markMaterial);
   group.add(body, mark);
   group.position.z = -0.11;
@@ -71,7 +71,7 @@ export function createCase({ mats, hi }) {
   const lug = lugs(hi);
   const polished = merge([latheStrips(CASE_POLISHED, segments), lug.polished]);
   const satin = merge([latheStrips(CASE_SATIN, segments), lug.satin]);
-  group.add(new Mesh(polished, mats.metal('polished', 'case')), new Mesh(satin, mats.metal('satin', 'case')), crown(mats, hi));
+  group.add(new Mesh(polished, mats.metal('polished')), new Mesh(satin, mats.metal('satin')), crown(mats, hi));
   return { group, rim: { radius: 1.0, z: -0.11 } };
 }
 
@@ -85,7 +85,7 @@ export function createBezel({ mats, hi }) {
     [[0.86, 0.04], [0.99, 0.04]],
   ];
   const group = new Group();
-  group.add(new Mesh(latheStrips(strips, hi ? 192 : 96), mats.metal('polished', 'bezel')));
+  group.add(new Mesh(latheStrips(strips, hi ? 192 : 96), mats.metal('polished')));
   return { group, rim: { radius: 0.99, z: 0.1 } };
 }
 
@@ -96,7 +96,7 @@ export function createCrystal({ mats, hi }) {
   const R = (r * r + sag * sag) / (2 * sag);
   const geometry = new SphereGeometry(R, hi ? 128 : 64, hi ? 16 : 10, 0, Math.PI * 2, 0, Math.asin(r / R));
   geometry.rotateX(Math.PI / 2).translate(0, 0, 0.17 - R);
-  const material = mats.sapphire('crystal');
+  const material = mats.sapphire();
   const mesh = new Mesh(geometry, material);
   mesh.renderOrder = 2;
   const group = new Group();

@@ -137,11 +137,9 @@ export function createStrap({ mats, hi }) {
 
   return {
     group,
-    /** 0..1: the halves slide out from the lugs and dissolve. */
+    /** 0..1: the halves slide out from the lugs (the stage fades them; see watch.js). */
     setPresence(value) {
-      group.visible = value > 0.01;
       halves.forEach((half) => (half.position.y = Math.sign(half.scale.y) * (1 - value) * 0.35));
-      mats.setLayerOpacity('strap', value);
     },
     dispose() {
       geometry.dispose();

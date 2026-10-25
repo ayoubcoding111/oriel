@@ -26,7 +26,7 @@ export function createCaseback({ mats, textures, hi }) {
     uv[i * 2 + 1] = pos.getY(i) / (2 * EXTENT) + 0.5;
   }
   face.setAttribute('uv', new Float32BufferAttribute(uv, 2));
-  const engraved = mats.metal('satin', 'caseback', {
+  const engraved = mats.metal('satin', {
     normalMap: textures.caseback.normal,
     aoMap: textures.caseback.ao,
     aoMapIntensity: 1,
@@ -39,15 +39,15 @@ export function createCaseback({ mats, textures, hi }) {
     notches.push(new BoxGeometry(0.05, 0.028, 0.012).rotateZ(a + Math.PI / 2).translate(Math.cos(a) * 0.885, Math.sin(a) * 0.885, -0.297));
   }
 
-  const glass = new Mesh(new CircleGeometry(0.62, segments / 2).rotateX(Math.PI).translate(0, 0, -0.29), mats.sapphire('caseback'));
+  const glass = new Mesh(new CircleGeometry(0.62, segments / 2).rotateX(Math.PI).translate(0, 0, -0.29), mats.sapphire());
   glass.renderOrder = 2;
 
   // The inner face, seen from above when the watch is taken apart.
   const inner = new RingGeometry(0.62, 0.9, segments, 1).translate(0, 0, -0.274);
 
   group.add(
-    new Mesh(merge([polished, ...notches]), mats.metal('polished', 'caseback')),
-    new Mesh(inner, mats.metal('satin', 'caseback')),
+    new Mesh(merge([polished, ...notches]), mats.metal('polished')),
+    new Mesh(inner, mats.metal('satin')),
     new Mesh(face, engraved),
     glass,
   );

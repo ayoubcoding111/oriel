@@ -57,6 +57,22 @@ export async function createWatch({ tier = 'high' } = {}) {
   for (const id of LAYER_ORDER) anchors[id] = { object: layers[id], local: new Vector3(parts[id].rim.radius, 0, parts[id].rim.z) };
   for (const [id, local] of Object.entries(parts.movement.focus)) anchors[id] = { object: layers.movement, local };
 
+  // Fade levels stacked on the bare movement, each adding its parts to the ones below it, so a level's presence
+  // never exceeds the one before. Mid-fade the stage renders once per level and blends the images by presence:
+  // parts fade as a whole, with no dithering and no sorting.
+  const levels = [
+    { objects: LAYER_ORDER.filter((id) => id !== 'movement').map((id) => layers[id]), presence: 1 },
+    { objects: [strap.group], presence: 1 },
+  ];
+
+  /** Shows the movement and the first `count` levels (every level that is present by default). */
+  function showLevels(count = levels.length) {
+    levels.forEach((level, i) => {
+      const visible = i < count && level.presence > 0.01;
+      for (const object of level.objects) object.visible = visible;
+    });
+  }
+
   const applied = { explode: NaN, isolate: NaN, strap: NaN };
   const angles = {};
   const down = new Vector3();
@@ -69,19 +85,16 @@ export async function createWatch({ tier = 'high' } = {}) {
       applied.explode = explode;
     }
     if (isolate !== applied.isolate) {
-      const presence = 1 - isolate;
-      for (const id of LAYER_ORDER) {
-        if (id === 'movement') continue;
-        mats.setLayerOpacity(id, presence);
-        layers[id].visible = presence > 0.01;
-      }
+      levels[0].presence = 1 - isolate;
       applied.isolate = isolate;
     }
     const strapPresence = strapValue * (1 - isolate) * (1 - Math.min(1, explode * 4));
     if (strapPresence !== applied.strap) {
       strap.setPresence(strapPresence);
+      levels[1].presence = strapPresence;
       applied.strap = strapPresence;
     }
+    showLevels();
   }
 
   function readGravity() {
@@ -97,7 +110,9 @@ export async function createWatch({ tier = 'high' } = {}) {
     layers,
     anchors,
     mats,
+    levels,
     setLayers,
+    showLevels,
     setConfig: (config, options) => mats.setConfig(config, options),
     getConfig: () => mats.getConfig(),
     /**

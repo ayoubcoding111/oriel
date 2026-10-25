@@ -1,14 +1,24 @@
 // The one WebGL stage per page: renderer, studio light, the watch, and a damped pose system that maps
 // resolution-independent poses (docs/DIRECTION.md §3) onto the scene. Pauses itself whenever it can't be seen.
 import {
+  CustomBlending,
   DirectionalLight,
   Euler,
+  HalfFloatType,
+  Mesh,
   NeutralToneMapping,
+  OneFactor,
+  OneMinusConstantAlphaFactor,
+  OrthographicCamera,
   PerspectiveCamera,
+  PlaneGeometry,
   Scene,
+  ShaderMaterial,
   SRGBColorSpace,
+  Vector2,
   Vector3,
   WebGLRenderer,
+  WebGLRenderTarget,
 } from 'three';
 import { createWatch } from './watch.js';
 import { createStudioEnvironment } from './environment.js';
@@ -20,8 +30,33 @@ const POSE_DAMPING = 6;
 const POINTER_DAMPING = 4;
 const TILT = 0.1; // radians at the edge of the screen (≈ 6°)
 const SNAPSHOT_TIME = { h: 10, m: 10, s: 32 };
+const MIN_WEIGHT = 0.004; // a fade level weighing less than this is not worth its own render
 
 const clamp = (v, min, max) => (v < min ? min : v > max ? max : v);
+
+// Lays a linear, premultiplied render of the watch over the canvas at a constant weight (the material's
+// blendAlpha): canvas = layer * weight + canvas * (1 - weight). Tone mapping and encoding match a direct render.
+const LAYER_BLEND = {
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tLayer;
+    uniform float uWeight;
+    varying vec2 vUv;
+    void main() {
+      vec4 texel = texture2D(tLayer, vUv);
+      // Tone map the unpremultiplied colour, like a direct render does before its edges are resolved.
+      float coverage = texel.a > 0.001 ? texel.a : 1.0;
+      gl_FragColor = vec4(texel.rgb / coverage, 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+      gl_FragColor = vec4(gl_FragColor.rgb * coverage, texel.a) * uWeight;
+    }`,
+};
 
 /**
  * @param {{ canvas: HTMLCanvasElement, tier?: 'high' | 'low', time?: 'live' | 'fixed' }} options
@@ -45,6 +80,25 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
   const fill = new DirectionalLight('#f3ece2', 0.45);
   fill.position.set(1, -5, 4);
   scene.add(key, rim, fill);
+
+  // Mid-fade, every level after the first renders here and is blended onto the canvas (see draw()).
+  // Sized to the drawing buffer on first use.
+  const layerTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: hi ? 4 : 0 });
+  const layerBlend = new ShaderMaterial({
+    ...LAYER_BLEND,
+    uniforms: { tLayer: { value: layerTarget.texture }, uWeight: { value: 1 } },
+    blending: CustomBlending,
+    blendSrc: OneFactor,
+    blendDst: OneMinusConstantAlphaFactor,
+    blendSrcAlpha: OneFactor,
+    blendDstAlpha: OneMinusConstantAlphaFactor,
+    depthTest: false,
+    depthWrite: false,
+  });
+  const layerQuad = new Mesh(new PlaneGeometry(2, 2), layerBlend);
+  layerQuad.frustumCulled = false;
+  const quadCamera = new OrthographicCamera();
+  const bufferSize = new Vector2();
 
   const target = { ...DEFAULT_POSE };
   const current = { ...DEFAULT_POSE };
@@ -124,11 +178,43 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
     }
   }
 
+  /**
+   * Renders the watch. While parts are fading, it renders once per fade level in play (movement alone, + case,
+   * + strap) and blends the images by presence, so each set of parts fades out as one piece.
+   */
+  function draw() {
+    const { levels } = watch;
+    let presence = 1; // of the image showing the first `count` levels
+    let drawn = 0; // weight already on the canvas
+    for (let count = 0; count <= levels.length; count++) {
+      const next = count < levels.length ? Math.min(presence, levels[count].presence) : 0;
+      const weight = presence - next;
+      presence = next;
+      if (weight < MIN_WEIGHT) continue;
+      watch.showLevels(count);
+      if (drawn === 0) {
+        renderer.render(scene, camera);
+      } else {
+        renderer.getDrawingBufferSize(bufferSize);
+        layerTarget.setSize(bufferSize.x, bufferSize.y);
+        renderer.setRenderTarget(layerTarget);
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        layerBlend.blendAlpha = layerBlend.uniforms.uWeight.value = weight / (drawn + weight);
+        renderer.autoClear = false;
+        renderer.render(layerQuad, quadCamera);
+        renderer.autoClear = true;
+      }
+      drawn += weight;
+    }
+    watch.showLevels();
+  }
+
   function render(dt) {
     applyPose(dt);
     if (current.visibility < 0.004 && target.visibility < 0.004) return;
     watch.update(dt, readClock());
-    renderer.render(scene, camera);
+    draw();
     frameCallbacks.forEach((cb) => cb(api));
   }
 
@@ -171,7 +257,13 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
     scene.add(watch.root);
     if (pendingConfig) watch.setConfig(pendingConfig, { immediate: true });
     applyPose(0);
-    await renderer.compileAsync(scene, camera);
+    // Programs are compiled when compileAsync is called, so this also covers the layer target's variants and
+    // the blend: the first fade won't stall on shader compiles.
+    const compiling = [renderer.compileAsync(scene, camera), renderer.compileAsync(layerQuad, quadCamera)];
+    renderer.setRenderTarget(layerTarget);
+    compiling.push(renderer.compileAsync(scene, camera));
+    renderer.setRenderTarget(null);
+    await Promise.all(compiling);
     watch.settle();
     render(0);
     last = performance.now();
@@ -292,7 +384,7 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
       applyPose(0);
       watch.settle();
       watch.update(0, at);
-      renderer.render(scene, camera);
+      draw();
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 
       Object.assign(target, saved.target);
@@ -326,6 +418,9 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
       lostCallbacks.clear();
       watch?.dispose();
       env?.dispose();
+      layerTarget.dispose();
+      layerBlend.dispose();
+      layerQuad.geometry.dispose();
       renderer.dispose();
     },
   };

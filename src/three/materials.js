@@ -110,18 +110,13 @@ export function createMaterials({ tier, textures, dialRadius }) {
   const hi = tier !== 'low';
   const all = new Set();
   const byKind = new Map();
-  const byLayer = new Map();
   const cache = new Map();
 
-  function register(material, kind, layer) {
+  function register(material, kind) {
     all.add(material);
     if (kind) {
       if (!byKind.has(kind)) byKind.set(kind, new Set());
       byKind.get(kind).add(material);
-    }
-    if (layer) {
-      if (!byLayer.has(layer)) byLayer.set(layer, new Set());
-      byLayer.get(layer).add(material);
     }
     return material;
   }
@@ -150,9 +145,8 @@ export function createMaterials({ tier, textures, dialRadius }) {
 
   // ---------- factories ----------
 
-  function metal(kind, layer, extra = {}) {
-    const key = `${kind}:${layer}`;
-    if (!Object.keys(extra).length && cache.has(key)) return cache.get(key);
+  function metal(kind, extra = {}) {
+    if (!Object.keys(extra).length && cache.has(kind)) return cache.get(kind);
     const s = state[kind];
     const material = new MeshPhysicalMaterial({
       color: s.color.clone(),
@@ -162,12 +156,11 @@ export function createMaterials({ tier, textures, dialRadius }) {
       clearcoatRoughness: s.clearcoatRoughness,
       ior: s.ior,
       specularIntensity: s.specularIntensity,
-      alphaHash: true,
       ...extra,
     });
     if (kind === 'satin' && hi) material.anisotropy = s.anisotropy;
-    register(material, kind, layer);
-    if (!Object.keys(extra).length) cache.set(key, material);
+    register(material, kind);
+    if (!Object.keys(extra).length) cache.set(kind, material);
     return material;
   }
 
@@ -182,9 +175,7 @@ export function createMaterials({ tier, textures, dialRadius }) {
       anisotropyMap: textures.sunburstAniso,
       normalMap: textures.sunburstLines,
       normalScale: new Vector2(state.dial.normalScale, state.dial.normalScale),
-      alphaHash: true,
     }),
-    'dial',
     'dial',
   );
   dial.onBeforeCompile = (shader) => {
@@ -214,10 +205,8 @@ export function createMaterials({ tier, textures, dialRadius }) {
       roughness: state.flange.roughness,
       clearcoat: 0.6,
       clearcoatRoughness: 0.12,
-      alphaHash: true,
     }),
     'flange',
-    'dial',
   );
 
   const lume = register(
@@ -227,19 +216,14 @@ export function createMaterials({ tier, textures, dialRadius }) {
       emissiveIntensity: 0.07,
       roughness: 0.55,
       metalness: 0,
-      alphaHash: true,
     }),
-    null,
-    'hands',
   );
 
   const tip = register(
-    new MeshPhysicalMaterial({ color: '#cdb07a', metalness: 1, roughness: 0.16, alphaHash: true }),
-    null,
-    'hands',
+    new MeshPhysicalMaterial({ color: '#cdb07a', metalness: 1, roughness: 0.16 }),
   );
 
-  // Calfskin: soft sheen, fine grain. Strap halves fade with a dithered alpha hash, so no sorting issues.
+  // Calfskin: soft sheen, fine grain.
   textures.leather.repeat.set(1.6, 1.6);
   const leather = register(
     new MeshPhysicalMaterial({
@@ -253,19 +237,16 @@ export function createMaterials({ tier, textures, dialRadius }) {
       normalScale: new Vector2(0.45, 0.45),
       clearcoat: hi ? 0.18 : EPS,
       clearcoatRoughness: 0.45,
-      alphaHash: true,
     }),
     'leather',
-    'strap',
   );
   const stitch = register(
-    new MeshPhysicalMaterial({ color: state.stitch.color.clone(), roughness: 0.7, metalness: 0, sheen: 0.6, sheenRoughness: 0.6, alphaHash: true }),
+    new MeshPhysicalMaterial({ color: state.stitch.color.clone(), roughness: 0.7, metalness: 0, sheen: 0.6, sheenRoughness: 0.6 }),
     'stitch',
-    'strap',
   );
 
   // Sapphire: transmission on capable GPUs, otherwise additive reflections over the dial (black diffuse).
-  function sapphire(layer) {
+  function sapphire() {
     const material = hi
       ? new MeshPhysicalMaterial({
           color: '#ffffff',
@@ -291,9 +272,7 @@ export function createMaterials({ tier, textures, dialRadius }) {
           blending: AdditiveBlending,
           depthWrite: false,
         });
-    material.userData.baseSpecular = material.specularIntensity;
-    material.userData.baseClearcoat = material.clearcoat;
-    return register(material, 'glass', layer);
+    return register(material, 'glass');
   }
 
   // ---------- movement (fixed finishes) ----------
@@ -302,7 +281,7 @@ export function createMaterials({ tier, textures, dialRadius }) {
   textures.cotes.rotation = 0.42;
   textures.cotes.center.set(0.5, 0.5);
 
-  const physical = (params) => register(new MeshPhysicalMaterial(params), null, 'movement');
+  const physical = (params) => register(new MeshPhysicalMaterial(params));
   const movement = {
     plate: physical({ color: '#d2d5d8', metalness: 1, roughness: 0.34, normalMap: textures.perlage, normalScale: new Vector2(0.55, 0.55) }),
     bridge: physical({ color: '#dfe2e5', metalness: 1, roughness: 0.2, normalMap: textures.cotes, normalScale: new Vector2(0.65, 0.65) }),
@@ -445,20 +424,6 @@ export function createMaterials({ tier, textures, dialRadius }) {
     });
   }
 
-  /** Per-layer presence for the explode / movement isolation (alpha-hashed, so it stays in the opaque pass). */
-  function setLayerOpacity(layer, value) {
-    const set = byLayer.get(layer);
-    if (!set) return;
-    for (const m of set) {
-      if (m.userData.baseSpecular !== undefined) {
-        m.specularIntensity = m.userData.baseSpecular * value;
-        if (m.clearcoat > 0) m.clearcoat = Math.max(EPS, m.userData.baseClearcoat * value);
-      } else {
-        m.opacity = value;
-      }
-    }
-  }
-
   return {
     metal,
     sapphire,
@@ -472,7 +437,6 @@ export function createMaterials({ tier, textures, dialRadius }) {
     dialUniforms,
     springUniforms,
     setConfig,
-    setLayerOpacity,
     getConfig: () => ({ finish: finishId, dial: dialId }),
     register,
     all,
