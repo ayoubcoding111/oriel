@@ -6,7 +6,9 @@ into the movement, then rebuild it in your own metal and reserve one.
 
 > ORIEL is a concept. It is not a real brand, nothing is for sale, and checkout is switched off.
 
-![ORIEL hero: a procedural 3D watch beside the headline "Time, taken apart."](docs/screenshots/hero.jpg)
+[![ORIEL hero: a procedural 3D watch beside the headline "Time, taken apart." Click to watch the scroll tour.](docs/screenshots/hero.jpg)](docs/oriel-scroll-tour.mp4)
+
+**[▶ Watch the scroll tour](docs/oriel-scroll-tour.mp4)** · **[Live site](https://oriel-watch.vercel.app)**
 
 ## Highlights
 
@@ -35,7 +37,7 @@ Captured from the running site with `npm run screenshots`.
 
 ## Stack
 
-Vite · vanilla JavaScript (ES modules) · GSAP 3 (ScrollTrigger, SplitText, CustomEase) · Lenis · Three.js ·
+Vite · vanilla JavaScript (ES modules) · GSAP 3 (ScrollTrigger, CustomEase) · Lenis · Three.js ·
 Fontsource (Instrument Serif, Hanken Grotesk, DM Mono) · Solar icons via Iconify.
 
 ## Scripts
@@ -61,7 +63,7 @@ src/three/          procedural watch, materials, studio lighting, stage and pose
 src/ui/             buttons, cursor, nav, preloader, page transitions, bag, hold, odometer, configurator
 src/sections/       index-page chapters and the director that drives the watch from scroll
 src/pages/          product page
-scripts/            poster renderer, README screenshots, icon extraction
+scripts/            poster renderer, README screenshots
 ```
 
 ## Credits
