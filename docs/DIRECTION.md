@@ -106,7 +106,7 @@ env.tier            // 'high' | 'low' (small screens, few cores, low memory, sav
 env.mobile          // max-width: 767px at boot (use matchMedia live where layout depends on it)
 
 // src/core/motion.js
-gsap, ScrollTrigger, SplitText, CustomEase   // registered
+gsap, ScrollTrigger                         // exported (CustomEase registered)
 EASE = { out, inOut, drawer }                 // CustomEase names
 initSmoothScroll() → { lenis|null, destroy }  // null under reduced motion
 getLenis(), scrollToTarget(target, { offset, immediate }), lockScroll(), unlockScroll()
@@ -117,7 +117,7 @@ splitWords(el, { mask = true }) → { el, words: HTMLElement[] /* .w-i inner spa
 // returns null (and leaves el untouched) if el contains links, buttons or form controls.
 
 // src/data/catalog.js
-FINISHES, DIALS, EDITIONS, LAYERS, MOVEMENT_CHAPTERS, NUMBERS, SPECS
+FINISHES, DIALS, EDITIONS
 findFinish(id), findDial(id), findEdition(id), editionFor(finish, dial), priceOf(finish, dial),
 formatPrice(n), posterFor(finish, dial), productHref({ finish, dial }), DEFAULT_CONFIG
 ```

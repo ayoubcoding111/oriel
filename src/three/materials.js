@@ -1,6 +1,6 @@
 // Every material of the watch, grouped by what drives it: the case finish (polished, satin, accent metal),
 // the dial (lacquer, print, strap leather) or nothing (the movement). Config changes cross-fade the numbers.
-import { AdditiveBlending, Color, MeshPhysicalMaterial, Vector2, Vector3 } from 'three';
+import { Color, CustomBlending, MeshPhysicalMaterial, OneFactor, OneMinusSrcAlphaFactor, Vector2, Vector3 } from 'three';
 import { gsap, EASE } from '../core/motion.js';
 
 // Clearcoat and anisotropy never cross zero at runtime: that would recompile the shader mid-transition.
@@ -245,33 +245,23 @@ export function createMaterials({ tier, textures, dialRadius }) {
     'stitch',
   );
 
-  // Sapphire: transmission on capable GPUs, otherwise additive reflections over the dial (black diffuse).
+  // Sapphire: reflections added over what lies beneath (black diffuse), which the glass dims by its opacity. A thin
+  // flat crystal barely refracts, so this matches transmission without re-rendering the scene every frame.
   function sapphire() {
-    const material = hi
-      ? new MeshPhysicalMaterial({
-          color: '#ffffff',
-          metalness: 0,
-          roughness: 0.035,
-          transmission: 1,
-          thickness: 0,
-          ior: 1.77,
-          specularIntensity: 0.55,
-          specularColor: new Color('#c6d6ff'),
-          envMapIntensity: 1,
-        })
-      : new MeshPhysicalMaterial({
-          color: '#000000',
-          metalness: 0,
-          roughness: 0.035,
-          ior: 1.77,
-          clearcoat: 0.6,
-          clearcoatRoughness: 0.04,
-          specularIntensity: 0.55,
-          specularColor: new Color('#c6d6ff'),
-          transparent: true,
-          blending: AdditiveBlending,
-          depthWrite: false,
-        });
+    const material = new MeshPhysicalMaterial({
+      color: '#000000',
+      metalness: 0,
+      roughness: 0.035,
+      ior: 1.77,
+      specularIntensity: 0.5,
+      specularColor: new Color('#c6d6ff'),
+      transparent: true,
+      opacity: 0.07,
+      blending: CustomBlending,
+      blendSrc: OneFactor,
+      blendDst: OneMinusSrcAlphaFactor,
+      depthWrite: false,
+    });
     return register(material, 'glass');
   }
 

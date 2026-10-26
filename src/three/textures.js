@@ -30,7 +30,6 @@ export async function loadFonts(timeout = 2500) {
 
 // ---------- small numeric helpers ----------
 
-const fract = (x) => x - Math.floor(x);
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 const smoothstep = (a, b, x) => {
   const t = clamp01((x - a) / (b - a));
@@ -48,11 +47,14 @@ function valueNoise(x, y, period, seed) {
   const yi = Math.floor(y);
   const xf = x - xi;
   const yf = y - yi;
-  const wrap = (v) => ((v % period) + period) % period;
-  const a = hash2(wrap(xi), wrap(yi), seed);
-  const b = hash2(wrap(xi + 1), wrap(yi), seed);
-  const c = hash2(wrap(xi), wrap(yi + 1), seed);
-  const d = hash2(wrap(xi + 1), wrap(yi + 1), seed);
+  const x0 = ((xi % period) + period) % period;
+  const y0 = ((yi % period) + period) % period;
+  const x1 = x0 + 1 < period ? x0 + 1 : x0 + 1 - period;
+  const y1 = y0 + 1 < period ? y0 + 1 : y0 + 1 - period;
+  const a = hash2(x0, y0, seed);
+  const b = hash2(x1, y0, seed);
+  const c = hash2(x0, y1, seed);
+  const d = hash2(x1, y1, seed);
   const u = xf * xf * (3 - 2 * xf);
   const v = yf * yf * (3 - 2 * yf);
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
@@ -75,22 +77,19 @@ function rgbaTexture(data, size, options) {
 /** Height field (row 0 = v 0) → tangent-space normal map, +Y up. */
 function normalMapFromHeight(height, size, strength, { wrap = false, anisotropy } = {}) {
   const data = new Uint8Array(size * size * 4);
-  const at = (x, y) => {
-    if (wrap) {
-      x = (x + size) % size;
-      y = (y + size) % size;
-    } else {
-      x = x < 0 ? 0 : x >= size ? size - 1 : x;
-      y = y < 0 ? 0 : y >= size ? size - 1 : y;
-    }
-    return height[y * size + x];
-  };
+  const last = size - 1;
+  // Neighbours wrap round (tileable maps) or clamp at the edges.
+  const after = (v) => (v === last ? (wrap ? 0 : last) : v + 1);
+  const before = (v) => (v === 0 ? (wrap ? last : 0) : v - 1);
   for (let y = 0; y < size; y++) {
+    const row = y * size;
+    const up = after(y) * size;
+    const down = before(y) * size;
     for (let x = 0; x < size; x++) {
-      const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
-      const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+      const dx = (height[row + after(x)] - height[row + before(x)]) * strength;
+      const dy = (height[up + x] - height[down + x]) * strength;
       const inv = 1 / Math.sqrt(dx * dx + dy * dy + 1);
-      const i = (y * size + x) * 4;
+      const i = (row + x) * 4;
       data[i] = (-dx * inv * 0.5 + 0.5) * 255;
       data[i + 1] = (-dy * inv * 0.5 + 0.5) * 255;
       data[i + 2] = (inv * 0.5 + 0.5) * 255;
@@ -399,26 +398,23 @@ function engravingCanvas(size, draw) {
   return { canvas, height: boxBlur(height, size, 1) };
 }
 
+/** Box blur as two 1D passes (rows, then columns); samples past the edges are skipped. */
 function boxBlur(src, size, radius) {
-  const out = new Float32Array(src.length);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      let sum = 0;
-      let n = 0;
-      for (let j = -radius; j <= radius; j++) {
-        const yy = y + j;
-        if (yy < 0 || yy >= size) continue;
-        for (let i = -radius; i <= radius; i++) {
-          const xx = x + i;
-          if (xx < 0 || xx >= size) continue;
-          sum += src[yy * size + xx];
-          n++;
-        }
+  const pass = (input, stride, step) => {
+    const out = new Float32Array(input.length);
+    for (let line = 0; line < size; line++) {
+      const base = line * stride;
+      for (let k = 0; k < size; k++) {
+        const from = Math.max(0, k - radius);
+        const to = Math.min(size - 1, k + radius);
+        let sum = 0;
+        for (let j = from; j <= to; j++) sum += input[base + j * step];
+        out[base + k * step] = sum / (to - from + 1);
       }
-      out[y * size + x] = sum / n;
     }
-  }
-  return out;
+    return out;
+  };
+  return pass(pass(src, size, 1), 1, size);
 }
 
 /** Caseback ring engraving, mapped to the ring's planar UVs over [-extent, extent]. */
@@ -510,5 +506,3 @@ export async function createTextures({ tier, dialRadius, indices }) {
   };
   return textures;
 }
-
-export { fract, smoothstep };

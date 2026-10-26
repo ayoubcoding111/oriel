@@ -1,11 +1,10 @@
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { SplitText } from 'gsap/SplitText';
 import { CustomEase } from 'gsap/CustomEase';
 import Lenis from 'lenis';
 import { env } from './env.js';
 
-gsap.registerPlugin(ScrollTrigger, SplitText, CustomEase);
+gsap.registerPlugin(ScrollTrigger, CustomEase);
 
 // Same curves as the CSS tokens in tokens.css (docs/DIRECTION.md §2).
 CustomEase.create('oriel.out', '0.23, 1, 0.32, 1');
@@ -82,7 +81,10 @@ export function onReducedMotionChange(cb) {
   return () => query.removeEventListener('change', handler);
 }
 
-/** Re-measures ScrollTriggers once late layout changes (fonts, images) settle. */
+/**
+ * Re-measures ScrollTriggers once late layout changes (fonts, page load) settle. Images are left out: they all
+ * reserve their box (width/height + aspect-ratio), and a refresh per lazy image stalls the scroll it loads in.
+ */
 export function refreshOnLayoutChanges() {
   let raf = 0;
   const refresh = () => {
@@ -90,14 +92,11 @@ export function refreshOnLayoutChanges() {
     raf = requestAnimationFrame(() => ScrollTrigger.refresh());
   };
   document.fonts?.ready.then(refresh);
-  const images = [...document.images].filter((img) => !img.complete);
-  images.forEach((img) => img.addEventListener('load', refresh, { once: true }));
   window.addEventListener('load', refresh, { once: true });
   return () => {
     cancelAnimationFrame(raf);
-    images.forEach((img) => img.removeEventListener('load', refresh));
     window.removeEventListener('load', refresh);
   };
 }
 
-export { gsap, ScrollTrigger, SplitText, CustomEase };
+export { gsap, ScrollTrigger };

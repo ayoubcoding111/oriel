@@ -52,19 +52,6 @@ export function initButtons(root = document) {
   };
 }
 
-/**
- * Changes a button's label text and keeps the rolling clone in sync.
- * @param {HTMLElement} btnOrLabel  a .btn or its .btn__label
- * @param {string} text
- */
-export function setButtonLabel(btnOrLabel, text) {
-  const label = btnOrLabel.matches('.btn__label') ? btnOrLabel : btnOrLabel.querySelector('.btn__label');
-  if (!label) return;
-  label.dataset.text = text;
-  if (label.hasAttribute('data-rolled')) rollLabel(label, text);
-  else label.textContent = text;
-}
-
 function queryAll(node, selector) {
   const found = [...node.querySelectorAll(selector)];
   return node.matches?.(selector) ? [node, ...found] : found;

@@ -57,8 +57,10 @@ export const POSES = Object.freeze({
 
   // Product page: the canvas is its own ~4:5 box, the watch is centred.
   productFront: pose({ x: 0, y: 0.02, size: 0.7, rx: -0.12, ry: -0.18, rz: 0.04 }),
-  productProfile: pose({ x: 0, y: 0, size: 0.62, rx: -0.12, ry: -PI / 2 + 0.32, rz: 0 }),
-  productBack: pose({ x: 0, y: 0.02, size: 0.7, rx: -0.12, ry: PI + 0.2, rz: 0 }),
+  // Pulled back and shifted left so the whole strap loop fits in the box.
+  productProfile: pose({ x: -0.56, y: 0, size: 0.47, rx: -0.12, ry: -PI / 2 + 0.32, rz: 0 }),
+  // The closed strap runs right across the exhibition caseback, so this view slides it away.
+  productBack: pose({ x: 0, y: 0.02, size: 0.7, rx: -0.12, ry: PI + 0.2, rz: 0, strap: 0 }),
   productExploded: pose({ x: 0, y: -0.04, size: 0.3, rx: -1.02, ry: -0.24, rz: 0.06, explode: 1, strap: 0 }),
 
   // Stills for scripts/render-posters.mjs (square 1600 for the first three, 1200 x 1500 portrait for config).

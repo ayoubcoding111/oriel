@@ -14,7 +14,6 @@ import {
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const TAU = Math.PI * 2;
-export const MM = 0.05;
 
 /** Revolves an (r, z) profile around the watch axis. Traverse CCW in (r, z) for outward-facing normals. */
 export function lathe(profile, segments) {

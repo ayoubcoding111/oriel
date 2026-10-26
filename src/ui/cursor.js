@@ -1,5 +1,6 @@
-// Companion cursor for fine pointers: a gold dot and a trailing hairline ring that turns into a
-// labelled disc over [data-cursor="view|drag|hold"]. The native cursor stays.
+// Cursor for fine pointers: a gold dot on the pointer and a trailing hairline ring that turns into a
+// labelled disc over [data-cursor="view|drag|hold"]. It replaces the system arrow (html.has-cursor);
+// text fields keep their caret.
 import { gsap, EASE } from '../core/motion.js';
 import { env } from '../core/env.js';
 
@@ -22,8 +23,10 @@ export function initCursor() {
     } catch {}
   }
 
-  const dotX = gsap.quickTo(dot, 'x', { duration: 0.12, ease: EASE.out });
-  const dotY = gsap.quickTo(dot, 'y', { duration: 0.12, ease: EASE.out });
+  document.documentElement.classList.add('has-cursor');
+  // The dot is the pointer itself, so it sits exactly under it; only the ring trails.
+  const dotX = gsap.quickSetter(dot, 'x', 'px');
+  const dotY = gsap.quickSetter(dot, 'y', 'px');
   const ringX = gsap.quickTo(ring, 'x', { duration: 0.5, ease: EASE.out });
   const ringY = gsap.quickTo(ring, 'y', { duration: 0.5, ease: EASE.out });
 
@@ -127,6 +130,7 @@ export function initCursor() {
     modals?.disconnect();
     gsap.killTweensOf([dot, ring]);
     root.remove();
+    document.documentElement.classList.remove('has-cursor');
   };
 }
 

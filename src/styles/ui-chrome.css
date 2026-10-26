@@ -339,6 +339,22 @@ main[tabindex='-1']:focus {
   opacity: 0;
 }
 
+/* The dot and ring replace the system arrow; text fields keep their caret (the cursor hides over them). */
+.has-cursor,
+.has-cursor * {
+  cursor: none !important;
+}
+
+.has-cursor
+  :is(
+    textarea,
+    [contenteditable=''],
+    [contenteditable='true'],
+    input:not([type='button'], [type='submit'], [type='reset'], [type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file'], [type='image'])
+  ) {
+  cursor: text !important;
+}
+
 .cursor__ring,
 .cursor__dot {
   position: absolute;

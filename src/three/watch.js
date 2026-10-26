@@ -13,6 +13,8 @@ import { TAU } from './geometry.js';
 
 /** Separation along the case axis at explode = 1 (watch units). */
 const EXPLODE_OFFSET = { crystal: 2.8, bezel: 2.18, hands: 1.6, dial: 1.05, movement: 0.32, case: -0.62, caseback: -1.6 };
+/** Plane of the caseback window: from anywhere in front of it, the closed case hides the movement completely. */
+const WINDOW_Z = -0.29;
 
 /** Hand angles (clockwise from twelve). Seconds step 8 times a second: 28,800 vph. */
 export function handAngles({ h, m, s }, out = {}) {
@@ -65,12 +67,21 @@ export async function createWatch({ tier = 'high' } = {}) {
     { objects: [strap.group], presence: 1 },
   ];
 
-  /** Shows the movement and the first `count` levels (every level that is present by default). */
+  let movementVisible = true;
+
+  /** Shows the movement (unless sealed from view) and the first `count` levels (by default every present one). */
   function showLevels(count = levels.length) {
+    layers.movement.visible = movementVisible;
     levels.forEach((level, i) => {
       const visible = i < count && level.presence > 0.01;
       for (const object of level.objects) object.visible = visible;
     });
+  }
+
+  /** Every part, present or not (shader precompilation); showLevels() puts things back. */
+  function showAll() {
+    layers.movement.visible = true;
+    for (const level of levels) level.objects.forEach((object) => (object.visible = true));
   }
 
   const applied = { explode: NaN, isolate: NaN, strap: NaN };
@@ -79,7 +90,8 @@ export async function createWatch({ tier = 'high' } = {}) {
   const inverse = new Quaternion();
   const gravity = { x: 0, y: -1 };
 
-  function setLayers({ explode, movement: isolate, strap: strapValue }) {
+  /** @param {number} cameraZ the camera's height above the dial plane, in watch units (negative behind the watch) */
+  function setLayers({ explode, movement: isolate, strap: strapValue }, cameraZ) {
     if (explode !== applied.explode) {
       for (const id of LAYER_ORDER) layers[id].position.z = EXPLODE_OFFSET[id] * layerReveal(explode, id);
       applied.explode = explode;
@@ -94,6 +106,8 @@ export async function createWatch({ tier = 'high' } = {}) {
       levels[1].presence = strapPresence;
       applied.strap = strapPresence;
     }
+    // Its gears are a large share of the scene, so skip drawing them while the closed case hides them.
+    movementVisible = isolate > 0.001 || explode > 0.001 || cameraZ < WINDOW_Z;
     showLevels();
   }
 
@@ -113,6 +127,7 @@ export async function createWatch({ tier = 'high' } = {}) {
     levels,
     setLayers,
     showLevels,
+    showAll,
     setConfig: (config, options) => mats.setConfig(config, options),
     getConfig: () => mats.getConfig(),
     /**

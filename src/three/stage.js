@@ -31,6 +31,10 @@ const POINTER_DAMPING = 4;
 const TILT = 0.1; // radians at the edge of the screen (≈ 6°)
 const SNAPSHOT_TIME = { h: 10, m: 10, s: 32 };
 const MIN_WEIGHT = 0.004; // a fade level weighing less than this is not worth its own render
+const FADE_DPR = 1.5; // mid-fade the watch renders two or three times, at no more than this pixel ratio
+// Adaptive resolution: after two seconds of frames slower than SLOW_FRAME, the pixel ratio drops a step (never back up).
+const SLOW_FRAME = 1 / 40;
+const DPR_STEP = 0.25;
 
 const clamp = (v, min, max) => (v < min ? min : v > max ? max : v);
 
@@ -68,7 +72,10 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
   renderer.toneMapping = NeutralToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.outputColorSpace = SRGBColorSpace;
-  const maxDpr = hi ? 2 : 1.5;
+  renderer.autoClear = false;
+  renderer.debug.checkShaderErrors = import.meta.env.DEV;
+  const minDpr = hi ? 1 : 0.75;
+  let maxDpr = 1.5; // with 4x MSAA, sharp on high-density screens at under 60% of the pixels of 2x
 
   const scene = new Scene();
   const camera = new PerspectiveCamera(FOV, 1, 0.5, 60);
@@ -81,8 +88,7 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
   fill.position.set(1, -5, 4);
   scene.add(key, rim, fill);
 
-  // Mid-fade, every level after the first renders here and is blended onto the canvas (see draw()).
-  // Sized to the drawing buffer on first use.
+  // Mid-fade, every level renders here and is blended onto the canvas (see draw()). Sized to the drawing buffer.
   const layerTarget = new WebGLRenderTarget(1, 1, { type: HalfFloatType, samples: hi ? 4 : 0 });
   const layerBlend = new ShaderMaterial({
     ...LAYER_BLEND,
@@ -99,6 +105,7 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
   layerQuad.frustumCulled = false;
   const quadCamera = new OrthographicCamera();
   const bufferSize = new Vector2();
+  const weights = []; // per fade level, see draw()
 
   const target = { ...DEFAULT_POSE };
   const current = { ...DEFAULT_POSE };
@@ -106,6 +113,8 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
   const drag = { yaw: 0, velocity: 0, active: false };
   const euler = new Euler(0, 0, 0, 'XYZ');
   const offset = new Vector3();
+  const dialAxis = new Vector3();
+  const toCamera = new Vector3();
   const projected = new Vector3();
   const results = new Map();
   const clock = { h: 0, m: 0, s: 0 };
@@ -125,15 +134,22 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
   let raf = 0;
   let last = performance.now();
   let opacity = -1;
+  let frameTime = 1 / 60; // smoothed seconds per drawn frame
+  let slowFor = 0;
+  let settling = 3; // seconds before the resolution may drop (loading work makes early frames slow)
 
   canvas.style.transition = 'none';
 
+  /** Matches the drawing buffer to the canvas box. Reallocating it stalls the GPU, so only when something changed. */
   function resize() {
-    width = Math.max(1, canvas.clientWidth);
-    height = Math.max(1, canvas.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
+    const w = Math.max(1, canvas.clientWidth);
+    const h = Math.max(1, canvas.clientHeight);
+    const ratio = Math.min(window.devicePixelRatio || 1, maxDpr);
+    if (w === width && h === height && ratio === renderer.getPixelRatio()) return;
+    width = w;
+    height = h;
+    renderer.setDrawingBufferSize(w, h, ratio);
+    camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
 
@@ -169,7 +185,10 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
     // Put the pivot (ox, oy) at the requested screen point.
     offset.set(current.ox, current.oy, 0).multiplyScalar(scale).applyQuaternion(root.quaternion);
     root.position.set((current.x * viewWidth) / 2 - offset.x, (current.y * viewHeight) / 2 - offset.y, -offset.z);
-    watch.setLayers(current);
+    // The camera's height above the dial plane, in watch units: the watch hides what the closed case conceals.
+    dialAxis.set(0, 0, 1).applyQuaternion(root.quaternion);
+    toCamera.copy(camera.position).sub(root.position);
+    watch.setLayers(current, toCamera.dot(dialAxis) / scale);
 
     const visibility = clamp(current.visibility, 0, 1);
     if (Math.abs(visibility - opacity) > 0.002) {
@@ -180,42 +199,68 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
 
   /**
    * Renders the watch. While parts are fading, it renders once per fade level in play (movement alone, + case,
-   * + strap) and blends the images by presence, so each set of parts fades out as one piece.
+   * + strap) into the layer target and blends the images by presence, so each set of parts fades out as one piece.
+   * Otherwise it renders straight to the canvas. A fade never mixes the two, so materials only switch between
+   * their canvas and target shader programs when a fade starts or ends, not on every frame.
    */
   function draw() {
     const { levels } = watch;
     let presence = 1; // of the image showing the first `count` levels
-    let drawn = 0; // weight already on the canvas
+    let images = 0;
     for (let count = 0; count <= levels.length; count++) {
       const next = count < levels.length ? Math.min(presence, levels[count].presence) : 0;
-      const weight = presence - next;
+      weights[count] = presence - next < MIN_WEIGHT ? 0 : presence - next;
+      if (weights[count]) images++;
       presence = next;
-      if (weight < MIN_WEIGHT) continue;
-      watch.showLevels(count);
-      if (drawn === 0) {
-        renderer.render(scene, camera);
-      } else {
-        renderer.getDrawingBufferSize(bufferSize);
-        layerTarget.setSize(bufferSize.x, bufferSize.y);
-        renderer.setRenderTarget(layerTarget);
-        renderer.render(scene, camera);
-        renderer.setRenderTarget(null);
-        layerBlend.blendAlpha = layerBlend.uniforms.uWeight.value = weight / (drawn + weight);
-        renderer.autoClear = false;
-        renderer.render(layerQuad, quadCamera);
-        renderer.autoClear = true;
-      }
-      drawn += weight;
     }
+    renderer.setRenderTarget(null);
+    renderer.clear();
+    if (images > 1) {
+      const scale = Math.min(1, FADE_DPR / renderer.getPixelRatio());
+      renderer.getDrawingBufferSize(bufferSize);
+      layerTarget.setSize(Math.round(bufferSize.x * scale), Math.round(bufferSize.y * scale));
+    }
+    let drawn = 0; // weight already on the canvas
+    weights.forEach((weight, count) => {
+      if (!weight) return;
+      watch.showLevels(count);
+      if (images === 1) {
+        renderer.render(scene, camera);
+        return;
+      }
+      renderer.setRenderTarget(layerTarget);
+      renderer.clear();
+      renderer.render(scene, camera);
+      renderer.setRenderTarget(null);
+      layerBlend.blendAlpha = layerBlend.uniforms.uWeight.value = weight / (drawn + weight);
+      renderer.render(layerQuad, quadCamera);
+      drawn += weight;
+    });
     watch.showLevels();
   }
 
+  /** Returns whether a frame was drawn. */
   function render(dt) {
     applyPose(dt);
-    if (current.visibility < 0.004 && target.visibility < 0.004) return;
+    if (current.visibility < 0.004 && target.visibility < 0.004) return false;
     watch.update(dt, readClock());
     draw();
     frameCallbacks.forEach((cb) => cb(api));
+    return true;
+  }
+
+  /** Lowers the pixel ratio a step after a sustained run of slow frames. */
+  function governResolution(dt) {
+    if ((settling -= dt) > 0) return;
+    frameTime += (dt - frameTime) * 0.1;
+    slowFor = frameTime > SLOW_FRAME ? slowFor + dt : 0;
+    const ratio = renderer.getPixelRatio();
+    if (slowFor < 2 || ratio <= minDpr) return;
+    maxDpr = Math.max(minDpr, ratio - DPR_STEP);
+    resize();
+    slowFor = 0;
+    frameTime = 1 / 60;
+    settling = 0.5;
   }
 
   function loop(now) {
@@ -223,7 +268,7 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (!watch || lost || !running || !inView || document.hidden) return;
-    render(dt);
+    if (render(dt)) governResolution(dt);
   }
 
   const resizeObserver = new ResizeObserver(() => resize());
@@ -257,17 +302,27 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
     scene.add(watch.root);
     if (pendingConfig) watch.setConfig(pendingConfig, { immediate: true });
     applyPose(0);
-    // Programs are compiled when compileAsync is called, so this also covers the layer target's variants and
-    // the blend: the first fade won't stall on shader compiles.
-    const compiling = [renderer.compileAsync(scene, camera), renderer.compileAsync(layerQuad, quadCamera)];
-    renderer.setRenderTarget(layerTarget);
-    compiling.push(renderer.compileAsync(scene, camera));
-    renderer.setRenderTarget(null);
-    await Promise.all(compiling);
+    // Programs are created when compileAsync is called, for visible objects only: show every part meanwhile.
+    // The first frame needs the canvas variants; the layer target's (only used mid-fade, once the visitor
+    // scrolls) compile in the background after it.
+    const compileAll = (renderTarget) => {
+      watch.showAll();
+      renderer.setRenderTarget(renderTarget);
+      const compiled = renderer.compileAsync(scene, camera);
+      renderer.setRenderTarget(null);
+      watch.showLevels();
+      return compiled;
+    };
+    await Promise.all([compileAll(null), renderer.compileAsync(layerQuad, quadCamera)]);
+    // Draw every part once while the preloader still covers the page: geometry and textures upload on first draw,
+    // so nothing stalls when a hidden part (the movement, the strap) first comes into view.
+    watch.showAll();
+    renderer.render(scene, camera);
     watch.settle();
     render(0);
     last = performance.now();
     raf = requestAnimationFrame(loop);
+    compileAll(layerTarget).catch(() => {});
   })();
 
   const api = {
@@ -375,8 +430,7 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
       spinAngle = 0;
       drag.yaw = 0;
       pointer.x = pointer.y = pointer.tx = pointer.ty = 0;
-      renderer.setPixelRatio(1);
-      renderer.setSize(w, h, false);
+      renderer.setDrawingBufferSize(w, h, 1);
       width = w;
       height = h;
       camera.aspect = w / h;
@@ -404,7 +458,6 @@ export function createStage({ canvas, tier = 'high', time = 'live' }) {
     stop() {
       running = false;
     },
-    resize,
 
     dispose() {
       if (disposed) return;

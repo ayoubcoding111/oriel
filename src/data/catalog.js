@@ -41,59 +41,6 @@ export const EDITIONS = [
 
 export const DEFAULT_CONFIG = Object.freeze({ finish: 'steel', dial: 'midnight' });
 
-/** The seven layers of the exploded view, top (crystal) to bottom (caseback). */
-export const LAYERS = [
-  { id: 'crystal', index: '01', name: 'Sapphire crystal', note: 'Domed and anti-reflective on both sides. Nine on the Mohs scale.' },
-  { id: 'bezel', index: '02', name: 'Bezel', note: 'Polished, with a 0.3 mm step that catches a single line of light.' },
-  { id: 'hands', index: '03', name: 'Hands', note: 'Dauphine, faceted by hand, filled with luminescent paint.' },
-  { id: 'dial', index: '04', name: 'Dial', note: 'Brass, fourteen coats of lacquer, twelve applied indices.' },
-  { id: 'movement', index: '05', name: 'Movement', note: 'Calibre O-1. 212 components, 31 jewels, regulated in five positions.' },
-  { id: 'case', index: '06', name: 'Case', note: '40 mm across, 11.2 mm thick. Satin flanks, polished bevels.' },
-  { id: 'caseback', index: '07', name: 'Caseback', note: 'Screwed down around a sapphire window. Water resistant to 100 m.' },
-];
-
-export const MOVEMENT_CHAPTERS = [
-  {
-    id: 'escapement',
-    index: 'i',
-    title: 'The escapement',
-    body: 'Twenty-eight thousand eight hundred times an hour, the pallet fork lets one tooth of the escape wheel go. You hear it as a tick. We hear a heartbeat.',
-    stat: '28,800',
-    unit: 'beats per hour',
-  },
-  {
-    id: 'barrel',
-    index: 'ii',
-    title: 'The mainspring',
-    body: 'A coiled blade inside the barrel stores the energy of your wrist. Fully wound, it runs for three days, long enough to leave on the nightstand for a weekend.',
-    stat: '72',
-    unit: 'hours of reserve',
-  },
-  {
-    id: 'rotor',
-    index: 'iii',
-    title: 'The rotor',
-    body: 'A half-moon of solid gold swings with every gesture and winds the spring in both directions. Movement, turned into time.',
-    stat: '360°',
-    unit: 'bidirectional winding',
-  },
-];
-
-export const NUMBERS = [
-  { value: 212, label: 'Components', caption: 'Every one finished before it is fitted.' },
-  { value: 31, label: 'Jewels', caption: 'Synthetic rubies where metal meets metal.' },
-  { value: 72, label: 'Hours', caption: 'Of power reserve, fully wound.' },
-  { value: 100, label: 'Metres', caption: 'Of water resistance, tested on every piece.' },
-  { value: 11, label: 'Months', caption: 'From first part to finished watch.' },
-  { value: 300, label: 'Pieces', caption: 'Made each year, each one numbered.' },
-];
-
-export const SPECS = [
-  { group: 'Case', items: [['Diameter', '40 mm'], ['Thickness', '11.2 mm'], ['Lug to lug', '47 mm'], ['Crystal', 'Domed sapphire, AR both sides'], ['Caseback', 'Screwed, sapphire window'], ['Water resistance', '100 m / 10 bar']] },
-  { group: 'Movement', items: [['Calibre', 'O-1, automatic'], ['Frequency', '28,800 vph (4 Hz)'], ['Power reserve', '72 hours'], ['Jewels', '31'], ['Components', '212'], ['Finishing', 'Côtes de Genève, perlage, blued screws']] },
-  { group: 'Dial & strap', items: [['Dial', 'Lacquered brass, applied indices'], ['Hands', 'Dauphine, luminescent'], ['Strap', 'Calfskin, 20 mm, pin buckle'], ['In the box', 'Second strap, walnut case']] },
-];
-
 export const findFinish = (id) => FINISHES.find((f) => f.id === id) ?? FINISHES[0];
 export const findDial = (id) => DIALS.find((d) => d.id === id) ?? DIALS[0];
 export const findEdition = (id) => EDITIONS.find((e) => e.id === id) ?? null;

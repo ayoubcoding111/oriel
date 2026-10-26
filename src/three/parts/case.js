@@ -1,6 +1,6 @@
 // Case middle (polished bevels, satin flanks), drilled lugs, crown; the stepped bezel; the domed crystal.
 import { CircleGeometry, CylinderGeometry, Group, Matrix4, Mesh, Shape, SphereGeometry } from 'three';
-import { circlePath, extrude, gearShape, lathe, latheStrips, merge, splitByNormal, splitGroups } from '../geometry.js';
+import { circlePath, extrude, gearShape, lathe, latheStrips, merge, splitByNormal } from '../geometry.js';
 
 /** Case middle profile pieces, (r, z), traversed so normals face out. */
 const CASE_POLISHED = [
@@ -103,5 +103,3 @@ export function createCrystal({ mats, hi }) {
   group.add(mesh);
   return { group, rim: { radius: r, z: 0.125 }, glass: [mesh] };
 }
-
-export { splitGroups };
