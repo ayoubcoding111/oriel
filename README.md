@@ -6,7 +6,7 @@ into the movement, then rebuild it in your own metal and reserve one.
 
 > ORIEL is a concept. It is not a real brand, nothing is for sale, and checkout is switched off.
 
-[![ORIEL hero: a procedural 3D watch beside the headline "Time, taken apart." Click to watch the scroll tour.](docs/screenshots/hero.jpg)](docs/oriel-scroll-tour.mp4)
+[![ORIEL scroll tour: the watch separates into layers, dives into the movement and rebuilds.](docs/oriel-scroll-tour.gif)](docs/oriel-scroll-tour.mp4)
 
 **[▶ Watch the scroll tour](docs/oriel-scroll-tour.mp4)** · **[Live site](https://oriel-watch.vercel.app)**
 
